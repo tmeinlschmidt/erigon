@@ -246,12 +246,17 @@ func (tx *tx) Commit() error {
 
 func (tx *tx) Rollback() {
 	// don't close opened cursors - just close stream, server will cleanup everything well
+	// TODO ?? shouldn't we close cursors anyways since they are rely on stream?
 	tx.closeGrpcStream()
 	tx.db.roTxsLimiter.Release(1)
 	for _, c := range tx.streams {
 		c.Close()
 	}
+	for _, c := range tx.statelessCursors {
+		c.Close()
+	}
 }
+
 func (tx *tx) DBSize() (uint64, error) { panic("not implemented") }
 
 func (tx *tx) statelessCursor(bucket string) (kv.Cursor, error) {

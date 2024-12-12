@@ -946,6 +946,9 @@ func (tx *MdbxTx) closeCursors() {
 		}
 	}
 	tx.toCloseMap = nil
+	for _, c := range tx.statelessCursors {
+		c.Close()
+	}
 	tx.statelessCursors = nil
 }
 

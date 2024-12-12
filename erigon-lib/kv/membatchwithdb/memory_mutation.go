@@ -459,6 +459,9 @@ func (m *MemoryMutation) Rollback() {
 
 func (m *MemoryMutation) Close() {
 	m.Rollback()
+	for _, c := range m.statelessCursors {
+		c.Close()
+	}
 }
 
 func (m *MemoryMutation) BucketSize(bucket string) (uint64, error) {
