@@ -981,7 +981,7 @@ func NewUpdates(m Mode, tmpdir string, hasher keyHasher) *Updates {
 	}
 	if t.mode == ModeDirect {
 		t.keys = make(map[string]struct{})
-		t.initCollector()
+		// t.initCollector()
 	} else if t.mode == ModeUpdate {
 		t.tree = btree.NewG[*KeyUpdate](64, keyUpdateLessFn)
 	}
@@ -1042,10 +1042,10 @@ func (t *Updates) TouchPlainKey(key string, val []byte, fn func(c *KeyUpdate, va
 		}
 	case ModeDirect:
 		if _, ok := t.keys[key]; !ok {
-			keyBytes := toBytesZeroCopy(key)
-			if err := t.etl.Collect(t.hasher(keyBytes), keyBytes); err != nil {
-				log.Warn("failed to collect updated key", "key", key, "err", err)
-			}
+			// keyBytes := toBytesZeroCopy(key)
+			// if err := t.etl.Collect(t.hasher(keyBytes), keyBytes); err != nil {
+			// 	log.Warn("failed to collect updated key", "key", key, "err", err)
+			// }
 			t.keys[key] = struct{}{}
 		}
 	default:
@@ -1120,16 +1120,29 @@ func (t *Updates) Close() {
 func (t *Updates) HashSort(ctx context.Context, fn func(hk, pk []byte, update *Update) error) error {
 	switch t.mode {
 	case ModeDirect:
-		clear(t.keys)
+		// clear(t.keys)
+		sorted := make([][][]byte, 0, len(t.keys))
+		for key := range t.keys {
+			keyBytes := toBytesZeroCopy(key)
+			hashBytes := t.hasher(keyBytes)
+			sorted = append(sorted, append([][]byte{}, hashBytes, keyBytes))
+		}
+		sort.Slice(sorted, func(i, j int) bool { return bytes.Compare(sorted[i][0], sorted[j][0]) < 0 })
 
-		err := t.etl.Load(nil, "", func(k, v []byte, table etl.CurrentTableReader, next etl.LoadNextFunc) error {
-			return fn(k, v, nil)
-		}, etl.TransformArgs{Quit: ctx.Done()})
-		if err != nil {
-			return err
+		for _, pair := range sorted {
+			if err := fn(pair[0], pair[1], nil); err != nil {
+				return err
+			}
 		}
 
-		t.initCollector()
+		// err := t.etl.Load(nil, "", func(k, v []byte, table etl.CurrentTableReader, next etl.LoadNextFunc) error {
+		// 	return fn(k, v, nil)
+		// }, etl.TransformArgs{Quit: ctx.Done()})
+		// if err != nil {
+		// 	return err
+		// }
+
+		// t.initCollector()
 	case ModeUpdate:
 		t.tree.Ascend(func(item *KeyUpdate) bool {
 			select {
