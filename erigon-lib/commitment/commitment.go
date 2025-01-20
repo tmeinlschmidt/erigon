@@ -1121,19 +1121,36 @@ func (t *Updates) HashSort(ctx context.Context, fn func(hk, pk []byte, update *U
 	switch t.mode {
 	case ModeDirect:
 		// clear(t.keys)
-		sorted := make([][][]byte, 0, len(t.keys))
+		type entry struct {
+			key       []byte
+			hashedKey [32]byte
+		}
+		sorted := make([]*entry, len(t.keys))
+		i := 0
 		for key := range t.keys {
 			keyBytes := toBytesZeroCopy(key)
 			hashBytes := t.hasher(keyBytes)
-			sorted = append(sorted, append([][]byte{}, hashBytes, keyBytes))
+			sorted[i] = &entry{
+				key:       keyBytes,
+				hashedKey: [32]byte(hashBytes),
+			}
+			i++
 		}
-		sort.Slice(sorted, func(i, j int) bool { return bytes.Compare(sorted[i][0], sorted[j][0]) < 0 })
+		sort.Slice(sorted, func(i, j int) bool {
+			return bytes.Compare(sorted[i].hashedKey[:], sorted[j].hashedKey[:]) < 0
+		})
 
-		for _, pair := range sorted {
-			if err := fn(pair[0], pair[1], nil); err != nil {
+		for _, entry := range sorted {
+			if err := fn(entry.hashedKey[:], entry.key, nil); err != nil {
 				return err
 			}
 		}
+
+		// for _, pair := range sorted {
+		// 	if err := fn(pair[0], pair[1], nil); err != nil {
+		// 		return err
+		// 	}
+		// }
 
 		// err := t.etl.Load(nil, "", func(k, v []byte, table etl.CurrentTableReader, next etl.LoadNextFunc) error {
 		// 	return fn(k, v, nil)
