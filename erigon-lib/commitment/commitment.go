@@ -1123,18 +1123,18 @@ func (t *Updates) HashSort(ctx context.Context, fn func(hk, pk []byte, update *U
 		// clear(t.keys)
 		type entry struct {
 			key       []byte
-			hashedKey [32]byte
+			hashedKey [64]byte
 		}
 		sorted := make([]*entry, len(t.keys))
-		i := 0
+		idx := 0
 		for key := range t.keys {
 			keyBytes := toBytesZeroCopy(key)
 			hashBytes := t.hasher(keyBytes)
-			sorted[i] = &entry{
+			sorted[idx] = &entry{
 				key:       keyBytes,
-				hashedKey: [32]byte(hashBytes),
+				hashedKey: [64]byte(hashBytes),
 			}
-			i++
+			idx++
 		}
 		sort.Slice(sorted, func(i, j int) bool {
 			return bytes.Compare(sorted[i].hashedKey[:], sorted[j].hashedKey[:]) < 0
