@@ -804,7 +804,9 @@ func (d *Domain) collateETL(ctx context.Context, stepFrom, stepTo uint64, wal *e
 		fromTxNum = (stepFrom - 1) * d.aggregationStep
 	}
 
-	//var stepInDB []byte
+	uniq := make(map[string]uint64)
+	var prevKey []byte
+	var prevVal []byte
 	err = wal.Load(nil, "", func(k, v []byte, table etl.CurrentTableReader, next etl.LoadNextFunc) error {
 		if d.largeValues {
 			kvs = append(kvs, struct {
@@ -812,23 +814,40 @@ func (d *Domain) collateETL(ctx context.Context, stepFrom, stepTo uint64, wal *e
 			}{k[:len(k)-8], v})
 		} else {
 
+			if len(prevKey) == 0 {
+				prevKey, prevVal = common.Copy(k), common.Copy(v)
+				return nil
+			} else if bytes.Equal(prevKey, k) {
+				prevVal = common.Copy(v)
+				return nil // skip
+			}
+
 			if vt != nil {
-				v, err = vt(v[8:], fromTxNum, endTxNum)
+				prevVal, err = vt(prevVal[8:], fromTxNum, endTxNum)
 				if err != nil {
 					return fmt.Errorf("vt: %w", err)
 				}
 			} else {
-				v = v[8:]
+				prevVal = prevVal[8:]
 			}
-			if err = comp.AddWord(k); err != nil {
-				return fmt.Errorf("add %s values key [%x]: %w", d.filenameBase, k, err)
+			uniq[string(prevKey)]++
+
+			if err = comp.AddWord(prevKey); err != nil {
+				return fmt.Errorf("add %s values key [%x]: %w", d.filenameBase, prevKey, err)
 			}
-			if err = comp.AddWord(v); err != nil {
-				return fmt.Errorf("add %s values [%x]=>[%x]: %w", d.filenameBase, k, v, err)
+			if err = comp.AddWord(prevVal); err != nil {
+				return fmt.Errorf("add %s values [%x]=>[%x]: %w", d.filenameBase, prevKey, prevVal, err)
 			}
+			prevKey, prevVal = common.Copy(k), common.Copy(v)
 		}
 		return nil
 	}, etl.TransformArgs{Quit: ctx.Done()})
+
+	for k, v := range uniq {
+		if v > 1 {
+			fmt.Printf("D %x %d\n", k, v)
+		}
+	}
 
 	sort.Slice(kvs, func(i, j int) bool {
 		return bytes.Compare(kvs[i].k, kvs[j].k) < 0
@@ -1300,6 +1319,7 @@ func buildAccessor(ctx context.Context, d *seg.Decompressor, compressed seg.File
 			return err
 		}
 		g.Reset(0)
+		uniq := make(map[string]uint64)
 		for g.HasNext() {
 			word, valPos = g.Next(word[:0])
 			if values {
@@ -1307,6 +1327,7 @@ func buildAccessor(ctx context.Context, d *seg.Decompressor, compressed seg.File
 					return fmt.Errorf("add idx key [%x]: %w", word, err)
 				}
 			} else {
+				uniq[string(word)]++
 				if err = rs.AddKey(word, keyPos); err != nil {
 					return fmt.Errorf("add idx key [%x]: %w", word, err)
 				}
@@ -1319,6 +1340,12 @@ func buildAccessor(ctx context.Context, d *seg.Decompressor, compressed seg.File
 		}
 		if err = rs.Build(ctx); err != nil {
 			if rs.Collision() {
+				fmt.Printf("col %v %v\n", err, d.FileName1)
+				for k, v := range uniq {
+					if v > 1 {
+						fmt.Printf("dup %x %d\n", []byte(k), v)
+					}
+				}
 				logger.Info("Building recsplit. Collision happened. It's ok. Restarting...")
 				rs.ResetNextSalt()
 			} else {

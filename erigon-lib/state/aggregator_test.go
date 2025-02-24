@@ -22,7 +22,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/erigontech/erigon-lib/types/accounts"
 	"math"
 	"math/rand"
 	"os"
@@ -32,6 +31,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/erigontech/erigon-lib/types/accounts"
 
 	"github.com/c2h5oh/datasize"
 
@@ -1325,6 +1326,7 @@ func TestAggregator_RebuildCommitmentBasedOnFiles(t *testing.T) {
 		stepSize:                         20,
 		disableCommitmentBranchTransform: false,
 	})
+	// log.SetRootHandler(log.LvlFilterHandler(log.LvlDebug, log.StderrHandler))
 
 	ac := agg.BeginFilesRo()
 	roots := make([]common.Hash, 0)

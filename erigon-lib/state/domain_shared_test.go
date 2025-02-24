@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/erigontech/erigon-lib/common"
-	accounts3 "github.com/erigontech/erigon-lib/types/accounts"
 	"testing"
 	"time"
+
+	"github.com/erigontech/erigon-lib/common"
+	accounts3 "github.com/erigontech/erigon-lib/types/accounts"
 
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ import (
 func TestSharedDomain_CommitmentKeyReplacement(t *testing.T) {
 	t.Parallel()
 
-	stepSize := uint64(100)
+	stepSize := uint64(10)
 	db, agg := testDbAndAggregatorv3(t, stepSize)
 
 	ctx := context.Background()
@@ -53,10 +54,11 @@ func TestSharedDomain_CommitmentKeyReplacement(t *testing.T) {
 	defer domains.Close()
 
 	rnd := newRnd(2342)
-	maxTx := stepSize * 8
+	maxTx := stepSize * 2
+	domains.sdCtx.patriciaTrie.SetTrace(true)
 
 	// 1. generate data
-	data := generateSharedDomainsUpdates(t, domains, maxTx, rnd, length.Addr, 10, stepSize)
+	data := generateSharedDomainsUpdates(t, domains, maxTx, rnd, length.Addr, 3, stepSize)
 	fillRawdbTxNumsIndexForSharedDomains(t, rwTx, maxTx, stepSize)
 
 	err = domains.Flush(ctx, rwTx)
