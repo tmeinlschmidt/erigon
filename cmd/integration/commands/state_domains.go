@@ -550,6 +550,11 @@ func requestDomains(chainDb, stateDb kv.RwDB, ctx context.Context, readDomain st
 				latestCounter = 1
 			}
 		}
+
+		totalKeys++
+		if totalKeys%100000 == 0 {
+			fmt.Printf("keys %s\n", libcommon.PrettyCounter(totalKeys))
+		}
 	}
 	fmt.Printf("Total storage keys: %d\n", totalKeys)
 	fmt.Printf("Fat addresses (unordered): %#+v\n", top10FatAddrs)
