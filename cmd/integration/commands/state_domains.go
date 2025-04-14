@@ -44,7 +44,6 @@ import (
 	downloadertype "github.com/erigontech/erigon-lib/downloader/snaptype"
 	"github.com/erigontech/erigon-lib/kv"
 	"github.com/erigontech/erigon-lib/kv/mdbx"
-	kv2 "github.com/erigontech/erigon-lib/kv/mdbx"
 	statelib "github.com/erigontech/erigon-lib/state"
 	"github.com/erigontech/erigon/cmd/utils"
 	"github.com/erigontech/erigon/core"
@@ -133,13 +132,13 @@ var readDomains = &cobra.Command{
 		}
 		defer chainDb.Close()
 
-		stateDb, err := kv2.New(kv.ChainDB, log.New()).Path(filepath.Join(dirs.DataDir, "statedb")).WriteMap(true).Open(ctx)
-		if err != nil {
-			return
-		}
-		defer stateDb.Close()
+		// stateDb, err := kv2.New(kv.ChainDB, log.New()).Path(filepath.Join(dirs.DataDir, "statedb")).WriteMap(true).Open(ctx)
+		// if err != nil {
+		// 	return
+		// }
+		// defer stateDb.Close()
 
-		if err := requestDomains(chainDb, stateDb, ctx, readFromDomain, addrs, logger); err != nil {
+		if err := requestDomains(chainDb, nil, ctx, readFromDomain, addrs, logger); err != nil {
 			if !errors.Is(err, context.Canceled) {
 				logger.Error(err.Error())
 			}
@@ -481,7 +480,7 @@ func makePurifiedDomains(db kv.RwDB, dirs datadir.Dirs, logger log.Logger, domai
 	return nil
 }
 
-func requestDomains(chainDb, stateDb kv.RwDB, ctx context.Context, readDomain string, addrs [][]byte, logger log.Logger) error {
+func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Context, readDomain string, addrs [][]byte, logger log.Logger) error {
 	sn, bsn, agg, _, _, _, err := allSnapshots(ctx, chainDb, logger)
 	if err != nil {
 		return err
@@ -493,7 +492,7 @@ func requestDomains(chainDb, stateDb kv.RwDB, ctx context.Context, readDomain st
 	aggTx := agg.BeginFilesRo()
 	defer aggTx.Close()
 
-	stateTx, err := stateDb.BeginRw(ctx)
+	stateTx, err := chainDb.BeginTemporalRw(ctx)
 	must(err)
 	defer stateTx.Rollback()
 	domains, err := state3.NewSharedDomains(stateTx, logger)
