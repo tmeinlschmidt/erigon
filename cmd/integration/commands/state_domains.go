@@ -529,26 +529,25 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 				latestCounter++
 			} else {
 				if latestCounter < 10 {
-					top10FatAddrs["upTo10"] = latestCounter
+					top10FatAddrs["upTo10"]++
 				} else if latestCounter < 100 {
-					top10FatAddrs["upTo100"] = latestCounter
+					top10FatAddrs["upTo100"]++
 				} else if latestCounter < 250 {
-					top10FatAddrs["upTo250"] = latestCounter
+					top10FatAddrs["upTo250"]++
 				} else if latestCounter < 500 {
-					top10FatAddrs["upTo500"] = latestCounter
+					top10FatAddrs["upTo500"]++
 				} else if latestCounter < 1000 {
-					top10FatAddrs["upTo1000"] = latestCounter
+					top10FatAddrs["upTo1000"]++
 				} else if latestCounter < 2000 {
-					top10FatAddrs["upTo2000"] = latestCounter
+					top10FatAddrs["upTo2000"]++
 				} else if latestCounter < 5000 {
-					top10FatAddrs["upTo5000"] = latestCounter
+					top10FatAddrs["upTo5000"]++
 				} else if latestCounter < 10000 {
-					top10FatAddrs["upTo10000"] = latestCounter
+					top10FatAddrs["upTo10000"]++
 				} else {
 					top10FatAddrs[string(latestPrefix)] = latestCounter
-					latestPrefix = key[:length.Addr]
 				}
-
+				latestPrefix = key[:length.Addr]
 				latestCounter = 1
 			}
 		}
