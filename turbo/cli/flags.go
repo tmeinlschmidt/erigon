@@ -404,7 +404,7 @@ func ApplyFlagsForEthConfigCobra(f *pflag.FlagSet, cfg *ethconfig.Config) {
 		mode.Blocks = prune.Distance(config3.DefaultPruneDistance) // 2048 is just some blocks to allow reorgs and data for rpc
 		mode.History = prune.Distance(config3.DefaultPruneDistance)
 	default:
-		utils.Fatalf("error: --prune.mode must be one of archive, full, minimal")
+		// utils.Fatalf("error: --prune.mode must be one of archive, full, minimal")
 	}
 	mode.Blocks = prune.Distance(blockDistance)
 	mode.History = prune.Distance(distance)
