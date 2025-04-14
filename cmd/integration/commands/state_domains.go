@@ -61,6 +61,7 @@ func init() {
 	withWorkers(readDomains)
 	withStartTx(readDomains)
 
+	withConfig(cmdPrintStages)
 	readDomains.Flags().String(erigoncli.PruneModeFlag.Name, erigoncli.PruneModeFlag.DefaultText, erigoncli.PruneModeFlag.Usage)
 
 	rootCmd.AddCommand(readDomains)
