@@ -17,6 +17,7 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -28,6 +29,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/erigontech/erigon-lib/etl"
 	"github.com/erigontech/erigon-lib/seg"
@@ -46,7 +48,6 @@ import (
 	statelib "github.com/erigontech/erigon-lib/state"
 	"github.com/erigontech/erigon/cmd/utils"
 	"github.com/erigontech/erigon/core"
-	"github.com/erigontech/erigon/core/state"
 	"github.com/erigontech/erigon/eth/ethconfig"
 	"github.com/erigontech/erigon/node/nodecfg"
 	erigoncli "github.com/erigontech/erigon/turbo/cli"
@@ -497,49 +498,107 @@ func requestDomains(chainDb, stateDb kv.RwDB, ctx context.Context, readDomain st
 		return err
 	}
 	defer agg.Close()
+	defer domains.Close()
 
-	r := state.NewReaderV3(domains)
-	if startTxNum != 0 {
-		return fmt.Errorf("failed to seek commitment to txn %d: %w", startTxNum, err)
+	it, err := aggTx.DbgDomain(kv.StorageDomain).DebugRangeLatest(stateTx, nil, nil, -1)
+	if err != nil {
+		return fmt.Errorf("failed to create iterator: %w", err)
 	}
-	latestTx := domains.TxNum()
-	if latestTx < startTxNum {
-		return fmt.Errorf("latest available txn to start is  %d and its less than start txn %d", latestTx, startTxNum)
-	}
-	logger.Info("seek commitment", "block", domains.BlockNum(), "tx", latestTx)
 
-	switch readDomain {
-	case "account":
-		for _, addr := range addrs {
+	totalKeys := 0
+	top10FatAddrs := make(map[string]int)
+	latestPrefix := make([]byte, 0)
+	latestCounter := 0
+	defer it.Close()
 
-			acc, err := r.ReadAccountData(libcommon.BytesToAddress(addr))
-			if err != nil {
-				logger.Error("failed to read account", "addr", addr, "err", err)
-				continue
-			}
-			fmt.Printf("%x: nonce=%d balance=%d code=%x root=%x\n", addr, acc.Nonce, acc.Balance.Uint64(), acc.CodeHash, acc.Root)
+	start := time.Now()
+
+	for it.HasNext() {
+		key, _, err := it.Next()
+		if err != nil {
+			return fmt.Errorf("failed to create iterator: %w", err)
 		}
-	case "storage":
-		for _, addr := range addrs {
-			a, s := libcommon.BytesToAddress(addr[:length.Addr]), libcommon.BytesToHash(addr[length.Addr:])
-			st, err := r.ReadAccountStorage(a, 0, &s)
-			if err != nil {
-				logger.Error("failed to read storage", "addr", a.String(), "key", s.String(), "err", err)
-				continue
+
+		if totalKeys == 0 {
+			latestPrefix = libcommon.Copy(key[:length.Addr])
+			latestCounter = 1
+		} else {
+			if bytes.Equal(latestPrefix, key[:length.Addr]) {
+				latestCounter++
+			} else {
+				if latestCounter < 10 {
+					top10FatAddrs["upTo10"] = latestCounter
+				} else if latestCounter < 100 {
+					top10FatAddrs["upTo100"] = latestCounter
+				} else if latestCounter < 250 {
+					top10FatAddrs["upTo250"] = latestCounter
+				} else if latestCounter < 500 {
+					top10FatAddrs["upTo500"] = latestCounter
+				} else if latestCounter < 1000 {
+					top10FatAddrs["upTo1000"] = latestCounter
+				} else if latestCounter < 2000 {
+					top10FatAddrs["upTo2000"] = latestCounter
+				} else if latestCounter < 5000 {
+					top10FatAddrs["upTo5000"] = latestCounter
+				} else if latestCounter < 10000 {
+					top10FatAddrs["upTo10000"] = latestCounter
+				} else {
+					top10FatAddrs[string(latestPrefix)] = latestCounter
+					latestPrefix = key[:length.Addr]
+				}
+
+				latestCounter = 1
 			}
-			fmt.Printf("%s %s -> %x\n", a.String(), s.String(), st)
-		}
-	case "code":
-		for _, addr := range addrs {
-			code, err := r.ReadAccountCode(libcommon.BytesToAddress(addr), 0)
-			if err != nil {
-				logger.Error("failed to read code", "addr", addr, "err", err)
-				continue
-			}
-			fmt.Printf("%s: %x\n", addr, code)
 		}
 	}
+	fmt.Printf("Total storage keys: %d\n", totalKeys)
+	fmt.Printf("Fat addresses (unordered): %#+v\n", top10FatAddrs)
+	fmt.Printf("Time taken to iterate: %s\n", time.Since(start))
+
 	return nil
+
+	// r := state.NewReaderV3(domains)
+	// if startTxNum != 0 {
+	// 	return fmt.Errorf("failed to seek commitment to txn %d: %w", startTxNum, err)
+	// }
+	// latestTx := domains.TxNum()
+	// if latestTx < startTxNum {
+	// 	return fmt.Errorf("latest available txn to start is  %d and its less than start txn %d", latestTx, startTxNum)
+	// }
+	// logger.Info("seek commitment", "block", domains.BlockNum(), "tx", latestTx)
+
+	// switch readDomain {
+	// case "account":
+	// 	for _, addr := range addrs {
+
+	// 		acc, err := r.ReadAccountData(libcommon.BytesToAddress(addr))
+	// 		if err != nil {
+	// 			logger.Error("failed to read account", "addr", addr, "err", err)
+	// 			continue
+	// 		}
+	// 		fmt.Printf("%x: nonce=%d balance=%d code=%x root=%x\n", addr, acc.Nonce, acc.Balance.Uint64(), acc.CodeHash, acc.Root)
+	// 	}
+	// case "storage":
+	// 	for _, addr := range addrs {
+	// 		a, s := libcommon.BytesToAddress(addr[:length.Addr]), libcommon.BytesToHash(addr[length.Addr:])
+	// 		st, err := r.ReadAccountStorage(a, 0, &s)
+	// 		if err != nil {
+	// 			logger.Error("failed to read storage", "addr", a.String(), "key", s.String(), "err", err)
+	// 			continue
+	// 		}
+	// 		fmt.Printf("%s %s -> %x\n", a.String(), s.String(), st)
+	// 	}
+	// case "code":
+	// 	for _, addr := range addrs {
+	// 		code, err := r.ReadAccountCode(libcommon.BytesToAddress(addr), 0)
+	// 		if err != nil {
+	// 			logger.Error("failed to read code", "addr", addr, "err", err)
+	// 			continue
+	// 		}
+	// 		fmt.Printf("%s: %x\n", addr, code)
+	// 	}
+	// }
+	// return nil
 }
 
 func removeMany(filePaths ...string) error {
