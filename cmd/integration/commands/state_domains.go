@@ -554,8 +554,8 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 		}
 
 		totalKeys++
-		if totalKeys%100000 == 0 {
-			fmt.Printf("keys %s\n", libcommon.PrettyCounter(totalKeys))
+		if totalKeys%1000000 == 0 {
+			fmt.Printf("keys %s %s\r", libcommon.PrettyCounter(totalKeys), time.Since(start))
 		}
 	}
 	fmt.Printf("Total storage keys: %d\n", totalKeys)
