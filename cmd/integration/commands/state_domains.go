@@ -508,6 +508,7 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 	}
 
 	totalKeys := 0
+	totalAddrs := 0
 	top10FatAddrs := make(map[string]int)
 	latestPrefix := make([]byte, 0)
 	latestCounter := 0
@@ -524,30 +525,32 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 		if totalKeys == 0 {
 			latestPrefix = libcommon.Copy(key[:length.Addr])
 			latestCounter = 1
+			totalAddrs++
 		} else {
 			if bytes.Equal(latestPrefix, key[:length.Addr]) {
 				latestCounter++
 			} else {
 				if latestCounter < 10 {
-					top10FatAddrs["upTo10"]++
+					top10FatAddrs["< 10"]++
 				} else if latestCounter < 100 {
-					top10FatAddrs["upTo100"]++
+					top10FatAddrs["< 100"]++
 				} else if latestCounter < 250 {
-					top10FatAddrs["upTo250"]++
+					top10FatAddrs["< 250"]++
 				} else if latestCounter < 500 {
-					top10FatAddrs["upTo500"]++
+					top10FatAddrs["< 500"]++
 				} else if latestCounter < 1000 {
-					top10FatAddrs["upTo1000"]++
+					top10FatAddrs["< 1000"]++
 				} else if latestCounter < 2000 {
-					top10FatAddrs["upTo2000"]++
+					top10FatAddrs["< 2000"]++
 				} else if latestCounter < 5000 {
-					top10FatAddrs["upTo5000"]++
+					top10FatAddrs["< 5000"]++
 				} else if latestCounter < 10000 {
-					top10FatAddrs["upTo10000"]++
+					top10FatAddrs["< 10000"]++
 				} else {
 					top10FatAddrs[string(latestPrefix)] = latestCounter
 				}
 				latestPrefix = key[:length.Addr]
+				totalAddrs++
 				latestCounter = 1
 			}
 		}
@@ -557,13 +560,10 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 		// 	fmt.Printf("keys %s %s\r", libcommon.PrettyCounter(totalKeys), time.Since(start))
 		// }
 	}
-	fmt.Printf("\nTotal storage keys: %d\n", totalKeys)
-	fmt.Printf("Fat addresses (unordered):\n", top10FatAddrs)
+	fmt.Printf("Total addresses: %d, slots %d spent %s\n", totalAddrs, totalKeys, time.Since(start))
 	for k, v := range top10FatAddrs {
 		fmt.Printf("%x: %d\n", []byte(k), v)
 	}
-	fmt.Printf("Time taken to iterate: %s\n", time.Since(start))
-
 	return nil
 
 	// r := state.NewReaderV3(domains)
