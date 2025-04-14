@@ -553,12 +553,15 @@ func requestDomains(chainDb kv.TemporalRwDB, stateDb kv.RwDB, ctx context.Contex
 		}
 
 		totalKeys++
-		if totalKeys%1000000 == 0 {
-			fmt.Printf("keys %s %s\r", libcommon.PrettyCounter(totalKeys), time.Since(start))
-		}
+		// if totalKeys%1000000 == 0 {
+		// 	fmt.Printf("keys %s %s\r", libcommon.PrettyCounter(totalKeys), time.Since(start))
+		// }
 	}
-	fmt.Printf("Total storage keys: %d\n", totalKeys)
-	fmt.Printf("Fat addresses (unordered): %#+v\n", top10FatAddrs)
+	fmt.Printf("\nTotal storage keys: %d\n", totalKeys)
+	fmt.Printf("Fat addresses (unordered):\n", top10FatAddrs)
+	for k, v := range top10FatAddrs {
+		fmt.Printf("%x: %d\n", []byte(k), v)
+	}
 	fmt.Printf("Time taken to iterate: %s\n", time.Since(start))
 
 	return nil
