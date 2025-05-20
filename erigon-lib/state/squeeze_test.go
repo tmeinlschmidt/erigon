@@ -127,15 +127,17 @@ func TestAggregator_SqueezeCommitment(t *testing.T) {
 	require.NoError(t, err)
 	defer acit.Close()
 
+	sdCtx := domains.GetCommitmentContext()
+
 	require.NoError(t, err)
 	for acit.HasNext() {
 		k, _, err := acit.Next()
 		require.NoError(t, err)
-		domains.sdCtx.updates.TouchPlainKey(string(k), nil, domains.sdCtx.updates.TouchAccount)
+		sdCtx.TouchKey(kv.AccountsDomain, string(k), nil)
 	}
 
 	// check if the commitment is the same
-	root, err := domains.ComputeCommitment(context.Background(), false, domains.BlockNum(), "")
+	root, err := sdCtx.ComputeCommitment(context.Background(), false, domains.BlockNum(), "")
 	require.NoError(t, err)
 	require.NotEmpty(t, root)
 	require.Equal(t, latestRoot, root)

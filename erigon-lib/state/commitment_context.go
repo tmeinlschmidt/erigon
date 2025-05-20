@@ -66,6 +66,7 @@ func (sdc *SharedDomainsCommitmentContext) Close() {
 func (sdc *SharedDomainsCommitmentContext) Reset() {
 	if !sdc.justRestored.Load() {
 		sdc.patriciaTrie.Reset()
+		//sdc.updates.Reset()
 	}
 }
 
