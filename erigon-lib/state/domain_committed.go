@@ -82,15 +82,6 @@ func (sd *SharedDomains) GetCommitmentContext() *SharedDomainsCommitmentContext 
 	return sd.sdCtx
 }
 
-// SeekCommitment lookups latest available commitment and sets it as current
-func (sd *SharedDomains) SeekCommitment(ctx context.Context, tx kv.Tx) (err error) {
-	_, _, _, err = sd.sdCtx.SeekCommitment(ctx, tx)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // LatestCommitment returns latest value for given prefix from CommitmentDomain.
 // Requires separate function because commitment values have references inside and we need to properly dereference them using
 // replaceShortenedKeysInBranch method on each read. Data stored in DB is not referenced (so as in history).

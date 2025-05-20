@@ -546,10 +546,14 @@ func aggregatorV3_RestartOnDatadir(t *testing.T, rc runCfg) {
 	require.NoError(t, err)
 	defer dom2.Close()
 
-	err = dom2.SeekCommitment(ctx, wrapTxWithCtx(rwTx, ac2))
+	cctx2 := NewSharedDomainsCommitmentContext(domains, commitment.ModeDirect, commitment.VariantHexPatriciaTrie)
+	defer cctx2.Close()
+
+	_, _, _, err = cctx2.SeekCommitment(ctx, wrapTxWithCtx(rwTx, ac2), dom2)
+	require.NoError(t, err)
+
 	sstartTx := dom2.TxNum()
 
-	require.NoError(t, err)
 	require.GreaterOrEqual(t, sstartTx, startTx)
 	require.GreaterOrEqual(t, sstartTx, latestCommitTxNum)
 	_ = sstartTx
@@ -1030,8 +1034,10 @@ func TestAggregatorV3_RestartOnFiles(t *testing.T) {
 	newDoms, err := NewSharedDomains(tx2, log.New())
 	require.NoError(t, err)
 	defer newDoms.Close()
+	cctx := NewSharedDomainsCommitmentContext(newDoms, commitment.ModeDirect, commitment.VariantHexPatriciaTrie)
+	defer cctx.Close()
 
-	err = newDoms.SeekCommitment(ctx, tx2)
+	_, _, _, err = cctx.SeekCommitment(ctx, tx2, newDoms)
 	require.NoError(t, err)
 	latestTx := newDoms.TxNum()
 	t.Logf("seek to latest_tx=%d", latestTx)

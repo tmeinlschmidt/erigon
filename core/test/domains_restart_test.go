@@ -216,6 +216,9 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutDB(t *testing.T) {
 	domains, err = state.NewSharedDomains(tx, log.New())
 	require.NoError(t, err)
 	defer domains.Close()
+	cctx := domains.GetCommitmentContext()
+	//cctx := state.NewSharedDomainsCommitmentContext(domains, commitment.ModeDirect, commitment.VariantHexPatriciaTrie)
+	//defer cctx.Close()
 
 	//{
 	//	cct := domains.Commitment.BeginFilesRo()
@@ -231,7 +234,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutDB(t *testing.T) {
 	//	cct.Close()
 	//}
 
-	err = domains.SeekCommitment(ctx, tx)
+	_, _, _, err = cctx.SeekCommitment(ctx, tx, domains)
 	require.NoError(t, err)
 	tx.Rollback()
 
@@ -250,11 +253,12 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutDB(t *testing.T) {
 	domains, err = state.NewSharedDomains(tx, log.New())
 	require.NoError(t, err)
 	defer domains.Close()
+	cctx = domains.GetCommitmentContext()
 	writer = state2.NewWriter(domains, nil)
 
 	txToStart := domains.TxNum()
 
-	rh, err = domains.ComputeCommitment(ctx, false, domains.BlockNum(), "")
+	rh, err = cctx.ComputeCommitment(ctx, false, domains.BlockNum(), "")
 	require.NoError(t, err)
 	t.Logf("restart hash %x\n", rh)
 
@@ -283,7 +287,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutDB(t *testing.T) {
 }
 
 func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
-	t.Skip("fix me: seems i don't clean all my files")
+	//t.Skip("fix me: seems i don't clean all my files")
 	// generate some updates on domains.
 	// record all roothashes on those updates after some POINT which will be stored in db and never fall to files
 	// remove whole datadir
@@ -311,6 +315,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 	require.NoError(t, err)
 	defer domains.Close()
 	domains.SetTxNum(0)
+	cctx := domains.GetCommitmentContext()
 
 	rnd := rand.New(rand.NewSource(time.Now().Unix()))
 
@@ -354,7 +359,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 		require.NoError(t, err)
 
 		if txNum%blockSize == 0 {
-			rh, err := domains.ComputeCommitment(ctx, true, domains.BlockNum(), "")
+			rh, err := cctx.ComputeCommitment(ctx, true, domains.BlockNum(), "")
 			require.NoError(t, err)
 
 			hashes = append(hashes, rh)
@@ -364,7 +369,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 		}
 	}
 
-	latestHash, err := domains.ComputeCommitment(ctx, true, domains.BlockNum(), "")
+	latestHash, err := cctx.ComputeCommitment(ctx, true, domains.BlockNum(), "")
 	require.NoError(t, err)
 	_ = latestHash
 	//require.EqualValues(t, params.MainnetGenesisHash, common.Hash(latestHash))
@@ -400,11 +405,14 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 	domains, err = state.NewSharedDomains(tx, log.New())
 	require.NoError(t, err)
 	defer domains.Close()
+	cctx = domains.GetCommitmentContext()
+	//cctx = state.NewSharedDomainsCommitmentContext(domains, commitment.ModeDirect, commitment.VariantHexPatriciaTrie)
 
-	err = domains.SeekCommitment(ctx, tx)
+	_, _, _, err = cctx.SeekCommitment(ctx, tx, domains)
 	tx.Rollback()
 	require.NoError(t, err)
 
+	cctx.Close()
 	domCtx.Close()
 	domains.Close()
 
@@ -417,9 +425,16 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 	defer tx.Rollback()
 	domCtx = agg.BeginFilesRo()
 	defer domCtx.Close()
+
 	domains, err = state.NewSharedDomains(tx, log.New())
 	require.NoError(t, err)
 	defer domains.Close()
+
+	cctx = domains.GetCommitmentContext()
+	//cctx = state.NewSharedDomainsCommitmentContext(domains, commitment.ModeDirect, commitment.VariantHexPatriciaTrie)
+	//defer cctx.Close()
+	_, _, _, err = cctx.SeekCommitment(ctx, tx, domains)
+	require.NoError(t, err)
 
 	writer = state2.NewWriter(domains, nil)
 
@@ -427,7 +442,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 	require.EqualValues(t, 0, txToStart)
 	txToStart = testStartedFromTxNum
 
-	rh, err := domains.ComputeCommitment(ctx, false, domains.BlockNum(), "")
+	rh, err := cctx.ComputeCommitment(ctx, false, domains.BlockNum(), "")
 	require.NoError(t, err)
 	require.Equal(t, params.TestGenesisStateRoot, common.BytesToHash(rh))
 	//require.NotEqualValues(t, latestHash, common.BytesToHash(rh))
@@ -447,7 +462,7 @@ func Test_AggregatorV3_RestartOnDatadir_WithoutAnything(t *testing.T) {
 		i++
 
 		if txNum%blockSize == 0 {
-			rh, err := domains.ComputeCommitment(ctx, true, domains.BlockNum(), "")
+			rh, err = cctx.ComputeCommitment(ctx, true, domains.BlockNum(), "")
 			require.NoError(t, err)
 			//fmt.Printf("tx %d rh %x\n", txNum, rh)
 			require.Equal(t, hashes[j], rh)

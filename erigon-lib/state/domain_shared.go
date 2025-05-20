@@ -122,8 +122,7 @@ func NewSharedDomains(tx kv.TemporalTx, logger log.Logger) (*SharedDomains, erro
 	}
 
 	sd.sdCtx = NewSharedDomainsCommitmentContext(sd, commitment.ModeDirect, tv)
-
-	if err := sd.SeekCommitment(context.Background(), tx); err != nil {
+	if _, _, _, err := sd.sdCtx.SeekCommitment(context.Background(), tx, sd); err != nil {
 		return nil, err
 	}
 

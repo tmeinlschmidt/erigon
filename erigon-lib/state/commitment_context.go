@@ -184,13 +184,15 @@ func (sdc *SharedDomainsCommitmentContext) enableConcurrentCommitmentIfPossible(
 	return nil
 }
 
-// SeekCommitment searches for last encoded state from DomainCommitted
-// and if state found, sets it up to current domain
-func (sdc *SharedDomainsCommitmentContext) SeekCommitment(ctx context.Context, tx kv.Tx) (blockNum, txNum uint64, ok bool, err error) {
+// SeekCommitment lookups for latest available encoded trie state from CommitmentDomain
+// and if state found, sets as tire state.
+func (sdc *SharedDomainsCommitmentContext) SeekCommitment(ctx context.Context, tx kv.Tx, sd *SharedDomains) (blockNum, txNum uint64, ok bool, err error) {
 	_, _, state, err := sdc.LatestCommitmentState()
 	if err != nil {
 		return 0, 0, false, err
 	}
+	//sd := sdc.mainTtx.sd
+
 	if state != nil {
 		blockNum, txNum, err = sdc.restorePatriciaState(state)
 		if err != nil {
@@ -205,8 +207,8 @@ func (sdc *SharedDomainsCommitmentContext) SeekCommitment(ctx context.Context, t
 				return 0, 0, false, fmt.Errorf("%w: TxNums index is at block %d and behind commitment %d", ErrBehindCommitment, lastBn, blockNum)
 			}
 		}
-		sdc.sharedDomains.SetBlockNum(blockNum)
-		sdc.sharedDomains.SetTxNum(txNum)
+		sd.SetBlockNum(blockNum)
+		sd.SetTxNum(txNum)
 		if err = sdc.enableConcurrentCommitmentIfPossible(); err != nil {
 			return 0, 0, false, err
 		}
@@ -224,19 +226,19 @@ func (sdc *SharedDomainsCommitmentContext) SeekCommitment(ctx context.Context, t
 			return 0, 0, false, err
 		}
 	}
-	sdc.sharedDomains.SetBlockNum(blockNum)
-	sdc.sharedDomains.SetTxNum(txNum)
+	sd.SetBlockNum(blockNum)
+	sd.SetTxNum(txNum)
 	if blockNum == 0 && txNum == 0 {
 		return 0, 0, true, nil
 	}
 
-	newRh, err := sdc.rebuildCommitment(ctx, sdc.sharedDomains.roTtx, blockNum, txNum)
+	newRh, err := sdc.rebuildCommitment(ctx, sd.roTtx, blockNum, txNum)
 	if err != nil {
 		return 0, 0, false, err
 	}
 	if bytes.Equal(newRh, empty.RootHash.Bytes()) {
-		sdc.sharedDomains.SetBlockNum(0)
-		sdc.sharedDomains.SetTxNum(0)
+		sd.SetBlockNum(0)
+		sd.SetTxNum(0)
 		return 0, 0, false, err
 	}
 	if sdc.trace {
