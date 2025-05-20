@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/erigontech/erigon-lib/common"
+	"github.com/holiman/uint256"
 	"math"
 	"sync/atomic"
 	"time"
@@ -23,10 +24,47 @@ import (
 	"github.com/erigontech/erigon-lib/types/accounts"
 )
 
+type CommitmentWriter struct {
+	ctx *SharedDomainsCommitmentContext
+}
+
+func (c *CommitmentWriter) UpdateAccountData(address common.Address, original, account *accounts.Account) error {
+	//upd := commitment.Update{
+	//	CodeHash:   account.CodeHash,
+	//	Storage:    [32]byte{},
+	//	StorageLen: 0,
+	//	Flags:      commitment.CodeUpdate | commitment.BalanceUpdate | commitment.NonceUpdate,
+	//	Balance:    account.Balance,
+	//	Nonce:      account.Nonce,
+	//}
+	c.ctx.TouchKey(kv.AccountsDomain, string(address.Bytes()), nil)
+	return nil
+}
+
+func (c *CommitmentWriter) UpdateAccountCode(address common.Address, incarnation uint64, codeHash common.Hash, code []byte) error {
+	c.ctx.TouchKey(kv.CodeDomain, string(address.Bytes()), code)
+	return nil
+}
+
+func (c *CommitmentWriter) DeleteAccount(address common.Address, original *accounts.Account) error {
+	c.ctx.TouchKey(kv.AccountsDomain, string(address.Bytes()), nil)
+	//c.ctx.sharedDomains.IterateStoragePrefix()
+	return nil
+}
+
+func (c *CommitmentWriter) WriteAccountStorage(address common.Address, incarnation uint64, key common.Hash, original, value *uint256.Int) error {
+	c.ctx.TouchKey(kv.StorageDomain, string(address.Bytes())+string(key.Bytes()), value.Bytes())
+	return nil
+}
+
+func (c *CommitmentWriter) CreateContract(address common.Address) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 type SharedDomainsCommitmentContext struct {
 	//mu            sync.Mutex // protects reads from sharedDomains when trie is concurrent
-	sharedDomains *SharedDomains
-	mainTtx       *TrieContext
+	mainTtx *TrieContext
 
 	updates      *commitment.Updates
 	patriciaTrie commitment.Trie
@@ -42,9 +80,7 @@ func (sdc *SharedDomainsCommitmentContext) SetLimitReadAsOfTxNum(txNum uint64, d
 }
 
 func NewSharedDomainsCommitmentContext(sd *SharedDomains, mode commitment.Mode, trieVariant commitment.TrieVariant) *SharedDomainsCommitmentContext {
-	ctx := &SharedDomainsCommitmentContext{
-		sharedDomains: sd,
-	}
+	ctx := &SharedDomainsCommitmentContext{}
 
 	ctx.patriciaTrie, ctx.updates = commitment.InitializeTrieAndUpdates(trieVariant, mode, sd.AggTx().a.tmpdir)
 	trieCtx := &TrieContext{
@@ -136,7 +172,7 @@ func (sdc *SharedDomainsCommitmentContext) ComputeCommitment(ctx context.Context
 	sdc.justRestored.Store(false)
 
 	if saveState {
-		if err = sdc.encodeAndStoreCommitmentState(blockNum, sdc.sharedDomains.txNum, rootHash); err != nil {
+		if err = sdc.encodeAndStoreCommitmentState(blockNum, sdc.mainTtx.sd.txNum, rootHash); err != nil {
 			return nil, err
 		}
 	}
