@@ -606,6 +606,30 @@ func (api *BaseAPI) getWitness(ctx context.Context, db kv.RoDB, blockNrOrHash rp
 		return nil, err
 	}
 	sdCtx := domains.GetCommitmentContext()
+	firstTxnInBlock, err := api._txNumReader.Min(txBatch2, blockNrOrHash.BlockNumber.Uint64())
+	fmt.Printf("getWitness: blockNr=%d, latestBlock=%d, regenerateHash=%v sdBlock %d sdTxn %d firstTxnInBlock=%d\n", blockNr, latestBlock, regenerateHash, domains.BlockNum(), domains.TxNum(), firstTxnInBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	// if blockNr < latestBlock {
+	// 	// Get first txnum of blockNumber+1 to ensure that correct state root will be restored as of blockNumber has been executed
+	// 	lastTxnInBlock, err := api._txNumReader.Min(tx, blockNrOrHash.BlockNumber.Uint64()+1)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	commitmentStartingTxNum := tx.Debug().HistoryStartFrom(kv.CommitmentDomain)
+	// 	if lastTxnInBlock < commitmentStartingTxNum {
+	// 		return nil, state.PrunedError
+	// 	}
+
+	// 	sdCtx.SetLimitReadAsOfTxNum(lastTxnInBlock, false)
+	// 	//domains.SetTrace(true)
+	// 	if err := domains.SeekCommitment(context.Background(), roTx); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	domains.SetTrace(false)
+	// }
 
 	// execute block #blockNr ephemerally. This will use TrieStateWriter to record touches of accounts and storage keys.
 	_, err = core.ExecuteBlockEphemerally(chainConfig, &vm.Config{}, store.GetHashFn, engine, block, store.Tds, store.TrieStateWriter, store.ChainReader, nil, logger)
