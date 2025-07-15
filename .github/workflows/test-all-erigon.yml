@@ -68,6 +68,8 @@ jobs:
         run: |
           set +x
           echo "I am being served by this runner: $RUNNER_NAME"
+          echo "Debug:"
+          df -h
           
       - name: Checkout code
         if: needs.source-of-changes.outputs.changed_files != 'true'
@@ -76,6 +78,9 @@ jobs:
       - name: Update submodules
         if: needs.source-of-changes.outputs.changed_files != 'true'
         run: git submodule update --init --recursive --force
+
+      - name: Debug output 2
+        run: df -h
         
       - name: Setup Go environment
         if: needs.source-of-changes.outputs.changed_files != 'true'
