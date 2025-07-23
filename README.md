@@ -121,9 +121,6 @@ make erigon
 ./build/bin/erigon
 ```
 
-Increase download speed by `--torrent.download.rate=20mb`. <code>🔬
-See [Downloader docs](./cmd/downloader/readme.md)</code>
-
 Use `--datadir` to choose where to store data.
 
 Use `--chain=gnosis` for [Gnosis Chain](https://www.gnosis.io/), `--chain=bor-mainnet` for Polygon Mainnet,
@@ -133,22 +130,32 @@ Erigon (https://docs.gnosischain.com/category/step--3---run-consensus-client).
 
 Running `make help` will list and describe the convenience commands available in the [Makefile](./Makefile).
 
+### Upgrading from 3.0 to 3.1
+
+When running Erigon 3.1+, your snapshot files will be upgraded automatically to a new file naming scheme. It's recommended that you take a backup or filesystem snapshot of your datadir before upgrading.
+
+The downloader component in Erigon 3.1 will check the file data of snapshots when `--downloader.verify` is provided. Incorrect data will be repaired.
+
+A new `snapshots reset` subcommand is added, that lets you trigger Erigon to perform an initial sync on the next run. Use this if your datadir is corrupted, or your client is unable to obtain missing snapshot data due to having committed to a snapshot that is no longer available. It will remove any locally generated files, and your chain data. Pass `--local=false` to force a resync but keep files that aren't in the latest snapshot.
+
 ### Datadir structure
 
 ```sh
 datadir        
-    chaindata     # "Recently-updated Latest State", "Recent History", "Recent Blocks"
-    snapshots     # contains `.seg` files - it's old blocks
-        domain    # Latest State
-        history   # Historical values 
-        idx       # InvertedIndices: can search/filtering/union/intersect them - to find historical data. like eth_getLogs or trace_transaction
-        accessor # Additional (generated) indices of history - have "random-touch" read-pattern. They can serve only `Get` requests (no search/filters).
-    txpool        # pending transactions. safe to remove.
-    nodes         # p2p peers. safe to remove.
-    temp          # used to sort data bigger than RAM. can grow to ~100gb. cleaned at startup.
+    chaindata/    # "Recently-updated Latest State", "Recent History", "Recent Blocks"
+    snapshots/    # contains `.seg` files - it's old blocks
+        domain/   # Latest State
+        history/  # Historical values 
+        idx/      # InvertedIndices: can search/filtering/union/intersect them - to find historical data. like eth_getLogs or trace_transaction
+        accessor/ # Additional (generated) indices of history - have "random-touch" read-pattern. They can serve only `Get` requests (no search/filters).
+    txpool/       # pending transactions. safe to remove.
+    nodes/        # p2p peers. safe to remove.
+    temp/         # used to sort data bigger than RAM. can grow to ~100gb. cleaned at startup.
    
 # There is 4 domains: account, storage, code, commitment 
 ```
+
+See the [lib](erigon-db/downloader/README.md) and [cmd](cmd/downloader/README.md) READMEs for more information.
 
 ### History on cheap disk
 
