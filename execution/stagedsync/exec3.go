@@ -807,15 +807,18 @@ Loop:
 						"flush", flushDuration, "compute commitment", computeCommitmentDuration, "tx.commit", commitDuration, "prune", pruneDuration)
 				}
 
-				fmt.Printf("SD reopens txns after commit; stack %v\n", dbg.Stack())
-				for i := 0; i < 16; i++ {
-					rotx, err := cfg.db.BeginRo(ctx)
-					if err != nil {
-						return err
-					}
-					defer rotx.Rollback()
+				if state2.ExperimentalConcurrentCommitment {
+					executor.domains().GetCommitmentContext().CloseSubTxns()
+					fmt.Printf("SD reopens txns after commit; stack %v\n", dbg.Stack())
+					for i := 0; i < 16; i++ {
+						rotx, err := cfg.db.BeginRo(ctx)
+						if err != nil {
+							return err
+						}
+						defer rotx.Rollback()
 
-					executor.domains().SetTxn(rotx.(kv.TemporalTx), uint(i)) // before commitment
+						executor.domains().SetTxn(rotx.(kv.TemporalTx), uint(i)) // before commitment
+					}
 				}
 			default:
 			}
@@ -847,12 +850,12 @@ Loop:
 	//dumpPlainStateDebug(executor.tx(), executor.domains())
 
 	if !useExternalTx && executor.tx() != nil {
-		if state2.ExperimentalConcurrentCommitment {
-			executor.domains().GetCommitmentContext().CloseSubTxns()
-		}
 		if err = executor.tx().Commit(); err != nil {
 			return err
 		}
+	}
+	if state2.ExperimentalConcurrentCommitment {
+		executor.domains().GetCommitmentContext().CloseSubTxns()
 	}
 
 	agg.BuildFilesInBackground(outputTxNum.Load())
