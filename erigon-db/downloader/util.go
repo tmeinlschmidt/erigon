@@ -347,21 +347,21 @@ func (d *Downloader) addTorrentSpec(
 	return
 }
 
-var added = 0
+var added atomic.Uint64
 
 func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
 		go func() {
-			added++
-			if added > 1000 {
+			added.Add(1)
+			if added.Load() > 100 {
 				time.Sleep(time.Minute)
 				log.Info("[snapshots] adding more 1K files")
 			}
-			if added > 2000 {
+			if added.Load() > 200 {
 				time.Sleep(time.Minute)
 				log.Info("[snapshots] adding more 1K files")
 			}
-			if added > 3000 {
+			if added.Load() > 300 {
 				time.Sleep(time.Minute)
 				log.Info("[snapshots] adding more 1K files")
 			}
