@@ -18,6 +18,8 @@ package downloader
 
 import (
 	"context"
+	"sync"
+
 	//nolint:gosec
 	"errors"
 	"fmt"
@@ -355,15 +357,21 @@ func (d *Downloader) afterAdd() {
 			added.Add(1)
 			if added.Load() > 100 {
 				time.Sleep(time.Minute)
-				log.Info("[snapshots] adding more 1K files")
+				sync.OnceFunc(func() {
+					log.Info("[snapshots] adding more 100 files")
+				})
 			}
 			if added.Load() > 200 {
 				time.Sleep(time.Minute)
-				log.Info("[snapshots] adding more 1K files")
+				sync.OnceFunc(func() {
+					log.Info("[snapshots] adding2 more 100 files")
+				})
 			}
 			if added.Load() > 300 {
 				time.Sleep(time.Minute)
-				log.Info("[snapshots] adding more 1K files")
+				sync.OnceFunc(func() {
+					log.Info("[snapshots] adding3 more 100 files")
+				})
 			}
 
 			// add webseed first - otherwise opts will be ignored
