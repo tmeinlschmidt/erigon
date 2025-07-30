@@ -352,10 +352,13 @@ var autoIncrement atomic.Uint64
 func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
 		// add webseed first - otherwise opts will be ignored
-		t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
 		t.AddTrackers(Trackers)
 	}
 	go func() {
+		log.Warn("[downloader] adding webseeds")
+		for _, t := range d.torrentClient.Torrents() {
+			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
+		}
 		time.Sleep(30 * time.Second)
 		log.Warn("[downloader] enabling downloading")
 		for _, t := range d.torrentClient.Torrents() {
