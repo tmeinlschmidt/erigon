@@ -106,7 +106,6 @@ func (s *GrpcServer) Add(ctx context.Context, request *proto_downloader.AddReque
 				return nil, err
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
 	s.d.afterAdd()
 	progress.Store(int32(len(request.Items)))

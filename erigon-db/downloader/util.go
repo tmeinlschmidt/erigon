@@ -356,19 +356,19 @@ func (d *Downloader) afterAdd() {
 		go func() {
 			id := autoIncrement.Add(1)
 
-			if id > 100 {
+			if id > 10 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding more 100 files")
 				})
 			}
-			if id > 200 {
+			if id > 20 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding2 more 100 files")
 				})
 			}
-			if id > 300 {
+			if id > 30 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding3 rest files")
