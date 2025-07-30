@@ -354,7 +354,6 @@ var added atomic.Uint64
 func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
 		go func() {
-			added.Add(1)
 			if added.Load() > 100 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
@@ -373,6 +372,8 @@ func (d *Downloader) afterAdd() {
 					log.Info("[snapshots] adding3 more 100 files")
 				})
 			}
+
+			added.Add(1)
 
 			// add webseed first - otherwise opts will be ignored
 			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
