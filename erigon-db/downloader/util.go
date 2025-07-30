@@ -353,15 +353,25 @@ func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
 		go func() {
 			added++
-			if added > 0 {
+			if added > 1000 {
 				time.Sleep(time.Minute)
+				log.Info("[snapshots] adding more 1K files")
 			}
+			if added > 2000 {
+				time.Sleep(time.Minute)
+				log.Info("[snapshots] adding more 1K files")
+			}
+			if added > 3000 {
+				time.Sleep(time.Minute)
+				log.Info("[snapshots] adding more 1K files")
+			}
+
+			// add webseed first - otherwise opts will be ignored
+			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
+			t.AddTrackers(Trackers)
+			t.AllowDataDownload()
+			t.AllowDataUpload()
 		}()
-		// add webseed first - otherwise opts will be ignored
-		t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
-		t.AddTrackers(Trackers)
-		t.AllowDataDownload()
-		t.AllowDataUpload()
 	}
 }
 
