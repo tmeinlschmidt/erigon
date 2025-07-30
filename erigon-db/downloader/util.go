@@ -183,7 +183,7 @@ func BuildTorrentIfNeed(ctx context.Context, fName, root string, torrentFiles *A
 	return torrentFiles.CreateWithMetaInfo(info, nil)
 }
 
-// BuildTorrentFilesIfNeed - create .torrent files from .seg files (big IO) - if .seg files were added manually
+// BuildTorrentFilesIfNeed - create .torrent files from .seg files (big IO) - if .seg files were autoIncrement manually
 func BuildTorrentFilesIfNeed(ctx context.Context, dirs datadir.Dirs, torrentFiles *AtomicTorrentFS, chain string, ignore snapcfg.PreverifiedItems, all bool) (int, error) {
 	logEvery := time.NewTicker(20 * time.Second)
 	defer logEvery.Stop()
@@ -320,7 +320,7 @@ func IsSnapNameAllowed(name string) bool {
 }
 
 // addTorrentSpec - adding .torrent file to torrentClient (and checking their hashes), if .torrent file
-// added first time - pieces verification process will start (disk IO heavy) - Progress
+// autoIncrement first time - pieces verification process will start (disk IO heavy) - Progress
 // kept in `piece completion storage` (surviving reboot). Once it's done - no disk IO needed again.
 // Don't need call torrent.VerifyData manually
 func (d *Downloader) addTorrentSpec(
@@ -349,26 +349,26 @@ func (d *Downloader) addTorrentSpec(
 	return
 }
 
-var added atomic.Uint64
+var autoIncrement atomic.Uint64
 
 func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
 		go func() {
-			newVal := added.Add(1)
+			id := autoIncrement.Add(1)
 
-			if newVal > 100 {
+			if id > 100 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding more 100 files")
 				})
 			}
-			if newVal > 200 {
+			if id > 200 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding2 more 100 files")
 				})
 			}
-			if newVal > 300 {
+			if id > 300 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
 					log.Info("[snapshots] adding3 more 100 files")

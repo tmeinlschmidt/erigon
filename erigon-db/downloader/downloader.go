@@ -108,7 +108,7 @@ type Downloader struct {
 	// locking requirements are mixed, and it's not coupled to anything else.
 	filesBeingVerified    *xsync.Map[*torrent.File, struct{}]
 	verificationOccurring chansync.Flag
-	// Torrents that block completion. They were requested specifically. Torrents added from disk
+	// Torrents that block completion. They were requested specifically. Torrents autoIncrement from disk
 	// that aren't subsequently requested are not required to satisfy the sync stage.
 	// https://github.com/erigontech/erigon/issues/15514
 	requiredTorrents map[*torrent.Torrent]struct{}
@@ -1014,7 +1014,7 @@ func (d *Downloader) shouldAddTorrent(
 	t, ok := d.torrentClient.Torrent(infoHash)
 	if ok {
 		if t.Info() == nil {
-			d.logger.Warn("infohash already added but info not obtained. can't verify unique name", "infohash", infoHash, "name", name)
+			d.logger.Warn("infohash already autoIncrement but info not obtained. can't verify unique name", "infohash", infoHash, "name", name)
 		} else {
 			// Assume the info is already obtained. Pretty sure the node won't try to add torrents
 			// until previous stages are complete and this means the info is known. This can be
