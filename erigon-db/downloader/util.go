@@ -352,6 +352,7 @@ func (d *Downloader) addTorrentSpec(
 var autoIncrement atomic.Uint64
 
 func (d *Downloader) afterAdd() {
+	time.Sleep(time.Second)
 	for _, t := range d.torrentClient.Torrents() {
 		go func() {
 			id := autoIncrement.Add(1)
