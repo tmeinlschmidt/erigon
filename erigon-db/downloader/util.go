@@ -369,7 +369,7 @@ func (d *Downloader) afterAdd() {
 	//}()
 
 	for i, t := range d.torrentClient.Torrents() {
-		if i > 10 {
+		if i > 100 {
 			break
 		}
 		// add webseed first - otherwise opts will be ignored
