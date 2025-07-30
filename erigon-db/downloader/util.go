@@ -355,11 +355,12 @@ func (d *Downloader) afterAdd() {
 		t.AddTrackers(Trackers)
 	}
 	go func() {
+		time.Sleep(20 * time.Second)
 		log.Warn("[downloader] adding webseeds")
 		for _, t := range d.torrentClient.Torrents() {
 			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(20 * time.Second)
 		log.Warn("[downloader] enabling downloading")
 		for _, t := range d.torrentClient.Torrents() {
 			t.AllowDataDownload()
