@@ -371,7 +371,7 @@ func (d *Downloader) afterAdd() {
 			if id > 300 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
-					log.Info("[snapshots] adding3 more 100 files")
+					log.Info("[snapshots] adding3 rest files")
 				})
 			}
 
