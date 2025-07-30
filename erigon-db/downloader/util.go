@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -350,54 +351,54 @@ func (d *Downloader) addTorrentSpec(
 var autoIncrement atomic.Uint64
 
 func (d *Downloader) afterAdd() {
-	for _, t := range d.torrentClient.Torrents() {
-		// add webseed first - otherwise opts will be ignored
-		t.AddTrackers(Trackers)
-	}
-	go func() {
-		time.Sleep(30 * time.Second)
-		log.Warn("[downloader] adding webseeds")
-		for _, t := range d.torrentClient.Torrents() {
-			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
-		}
-		time.Sleep(30 * time.Second)
-		log.Warn("[downloader] enabling downloading")
-		for _, t := range d.torrentClient.Torrents() {
-			t.AllowDataDownload()
-			t.AllowDataUpload()
-		}
-	}()
-
 	//for _, t := range d.torrentClient.Torrents() {
-	//	go func() {
-	//		id := autoIncrement.Add(1)
-	//
-	//		if id > 10 {
-	//			time.Sleep(time.Minute)
-	//			sync.OnceFunc(func() {
-	//				log.Warn("[snapshots] adding more 100 files")
-	//			})
-	//		}
-	//		if id > 20 {
-	//			time.Sleep(time.Minute)
-	//			sync.OnceFunc(func() {
-	//				log.Warn("[snapshots] adding2 more 100 files")
-	//			})
-	//		}
-	//		if id > 30 {
-	//			time.Sleep(time.Minute)
-	//			sync.OnceFunc(func() {
-	//				log.Warn("[snapshots] adding3 rest files")
-	//			})
-	//		}
-	//
-	//		// add webseed first - otherwise opts will be ignored
+	//	// add webseed first - otherwise opts will be ignored
+	//	t.AddTrackers(Trackers)
+	//}
+	//go func() {
+	//	time.Sleep(30 * time.Second)
+	//	log.Warn("[downloader] adding webseeds")
+	//	for _, t := range d.torrentClient.Torrents() {
 	//		t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
-	//		t.AddTrackers(Trackers)
+	//	}
+	//	time.Sleep(30 * time.Second)
+	//	log.Warn("[downloader] enabling downloading")
+	//	for _, t := range d.torrentClient.Torrents() {
 	//		t.AllowDataDownload()
 	//		t.AllowDataUpload()
-	//	}()
-	//}
+	//	}
+	//}()
+
+	for _, t := range d.torrentClient.Torrents() {
+		go func() {
+			id := autoIncrement.Add(1)
+
+			if id > 10 {
+				time.Sleep(time.Minute)
+				sync.OnceFunc(func() {
+					log.Warn("[snapshots] adding more 100 files")
+				})
+			}
+			if id > 20 {
+				time.Sleep(time.Minute)
+				sync.OnceFunc(func() {
+					log.Warn("[snapshots] adding2 more 100 files")
+				})
+			}
+			if id > 30 {
+				time.Sleep(time.Minute)
+				sync.OnceFunc(func() {
+					log.Warn("[snapshots] adding3 rest files")
+				})
+			}
+
+			// add webseed first - otherwise opts will be ignored
+			t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
+			t.AddTrackers(Trackers)
+			t.AllowDataDownload()
+			t.AllowDataUpload()
+		}()
+	}
 }
 
 func savePeerID(db kv.RwDB, peerID torrent.PeerID) error {
