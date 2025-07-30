@@ -359,19 +359,19 @@ func (d *Downloader) afterAdd() {
 			if id > 10 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
-					log.Info("[snapshots] adding more 100 files")
+					log.Warn("[snapshots] adding more 100 files")
 				})
 			}
 			if id > 20 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
-					log.Info("[snapshots] adding2 more 100 files")
+					log.Warn("[snapshots] adding2 more 100 files")
 				})
 			}
 			if id > 30 {
 				time.Sleep(time.Minute)
 				sync.OnceFunc(func() {
-					log.Info("[snapshots] adding3 rest files")
+					log.Warn("[snapshots] adding3 rest files")
 				})
 			}
 
