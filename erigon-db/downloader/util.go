@@ -347,8 +347,16 @@ func (d *Downloader) addTorrentSpec(
 	return
 }
 
+var added = 0
+
 func (d *Downloader) afterAdd() {
 	for _, t := range d.torrentClient.Torrents() {
+		go func() {
+			added++
+			if added > 0 {
+				time.Sleep(time.Minute)
+			}
+		}()
 		// add webseed first - otherwise opts will be ignored
 		t.AddWebSeeds(d.cfg.WebSeedUrls, d.addWebSeedOpts...)
 		t.AddTrackers(Trackers)
