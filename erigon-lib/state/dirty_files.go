@@ -29,6 +29,7 @@ import (
 
 	btree2 "github.com/tidwall/btree"
 
+	"github.com/erigontech/erigon-lib/common/dbg"
 	"github.com/erigontech/erigon-lib/common/dir"
 	"github.com/erigontech/erigon-lib/config3"
 	"github.com/erigontech/erigon-lib/datastruct/existence"
@@ -303,9 +304,13 @@ func (d *Domain) openDirtyFiles() (err error) {
 				if item.decompressor, err = seg.NewDecompressor(fPath); err != nil {
 					_, fName := filepath.Split(fPath)
 					if errors.Is(err, &seg.ErrCompressedFileCorrupted{}) {
-						d.logger.Debug("[agg] Domain.openDirtyFiles", "err", err, "f", fName)
+						err = fmt.Errorf("%s, %w", fName, err)
+						if dbg.AssertEnabled {
+							panic(err)
+						}
+						d.logger.Debug("[agg] Domain.openDirtyFiles", "err", err)
 					} else {
-						d.logger.Warn("[agg] Domain.openDirtyFiles", "err", err, "f", fName)
+						d.logger.Warn("[agg] Domain.openDirtyFiles", "err", err)
 					}
 					invalidFileItemsLock.Lock()
 					invalidFileItems = append(invalidFileItems, item)
@@ -333,7 +338,11 @@ func (d *Domain) openDirtyFiles() (err error) {
 					}
 					if item.index, err = recsplit.OpenIndex(fPath); err != nil {
 						_, fName := filepath.Split(fPath)
-						d.logger.Warn("[agg] Domain.openDirtyFiles", "err", err, "f", fName)
+						err = fmt.Errorf("%s, %w", fName, err)
+						if dbg.AssertEnabled {
+							panic(err)
+						}
+						d.logger.Warn("[agg] Domain.openDirtyFiles", "err")
 						// don't interrupt on error. other files may be good
 					}
 				}
