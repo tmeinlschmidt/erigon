@@ -20,9 +20,12 @@
 package core
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/erigontech/erigon-lib/chain"
 	"github.com/erigontech/erigon-lib/common"
@@ -96,7 +99,14 @@ func WriteGenesisIfNotExist(db kv.RwTx, g *types.Genesis) error {
 	if err != nil {
 		return err
 	}
-	return db.Put(kv.ConfigTable, kv.GenesisKey, val)
+
+	// Compress the JSON data
+	compressed, err := compressData(val)
+	if err != nil {
+		return fmt.Errorf("failed to compress genesis: %w", err)
+	}
+
+	return db.Put(kv.ConfigTable, kv.GenesisKey, compressed)
 }
 
 func ReadGenesis(db kv.Getter) (*types.Genesis, error) {
@@ -104,14 +114,61 @@ func ReadGenesis(db kv.Getter) (*types.Genesis, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(val) == 0 || string(val) == "null" {
+	if len(val) == 0 {
 		return nil, nil
 	}
+
+	// Try to decompress the data first
+	decompressed, err := decompressData(val)
+	if err != nil {
+		// If decompression fails, try to read as uncompressed (for backward compatibility)
+		if string(val) == "null" {
+			return nil, nil
+		}
+		var g types.Genesis
+		if err := json.Unmarshal(val, &g); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal genesis: %w", err)
+		}
+		return &g, nil
+	}
+
+	if string(decompressed) == "null" {
+		return nil, nil
+	}
+
 	var g types.Genesis
-	if err := json.Unmarshal(val, &g); err != nil {
-		return nil, err
+	if err := json.Unmarshal(decompressed, &g); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal genesis: %w", err)
 	}
 	return &g, nil
+}
+
+// compressData compresses the input data using gzip
+func compressData(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write(data); err != nil {
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// decompressData decompresses the input data using gzip
+func decompressData(data []byte) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer gr.Close()
+
+	decompressed, err := io.ReadAll(gr)
+	if err != nil {
+		return nil, err
+	}
+	return decompressed, nil
 }
 
 func AllSegmentsDownloadComplete(tx kv.Getter) (allSegmentsDownloadComplete bool, err error) {

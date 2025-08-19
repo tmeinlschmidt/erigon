@@ -44,6 +44,6 @@ func Arb1RollupGenesisBlock() *types.Genesis {
 		GasUsed:    0x0,
 		ParentHash: common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
 		BaseFee:    big.NewInt(0x5f5e100),
-		Alloc:      chainspec.ReadPreallocDirectly("hugeallocs/arb1.json"),
+		Alloc:      chainspec.ReadPreallocDirectly("arb/chain/hugeallocs/arb1.json"),
 	}
 }
