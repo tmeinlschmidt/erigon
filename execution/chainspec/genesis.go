@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io/fs"
 	"math/big"
+	"os"
 
 	"github.com/jinzhu/copier"
 
@@ -37,6 +38,21 @@ import (
 
 //go:embed allocs
 var allocs embed.FS
+
+func ReadPreallocDirectly(filename string) types.GenesisAlloc {
+	f, err := os.Open(filename)
+	if err != nil {
+		panic(fmt.Sprintf("Could not open genesis preallocation for %s: %v", filename, err))
+	}
+	defer f.Close()
+	decoder := json.NewDecoder(f)
+	ga := make(types.GenesisAlloc)
+	err = decoder.Decode(&ga)
+	if err != nil {
+		panic(fmt.Sprintf("Could not parse genesis preallocation for %s: %v", filename, err))
+	}
+	return ga
+}
 
 func ReadPrealloc(fileSys fs.FS, filename string) types.GenesisAlloc {
 	f, err := fileSys.Open(filename)
