@@ -35,7 +35,7 @@
         "DataAvailabilityCommittee": false,
         "InitialArbOSVersion": 6,
         "InitialChainOwner": "0xd345e41ae2cb00311956aa7109fc801ae8c81a52",
-        "GenesisBlockNum": 0,
+        "GenesisBlockNum": 22207818,
 
         "rollup": {
             "bridge": "0x8315177ab297ba92a06054ce80a67ed4dbd7ed3a",
