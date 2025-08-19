@@ -157,11 +157,11 @@ func SaveChainConfigIfNeed(
 			}
 			return nil
 		}); err != nil {
-			logger.Error("cant read chain config from core db", "err", err)
+			logger.Error("[txpool] cant read chain config from core DB", "err", err)
 			time.Sleep(5 * time.Second)
 			continue
 		} else if cc == nil {
-			logger.Error("cant read chain config from core db")
+			logger.Error("[txpool] cant read chain config from core db (nil config in DB)")
 			time.Sleep(5 * time.Second)
 			continue
 		}
