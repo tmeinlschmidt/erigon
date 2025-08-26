@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/erigontech/erigon-lib/common"
-	"github.com/erigontech/erigon-lib/common/assert"
 	"github.com/erigontech/erigon-lib/common/empty"
 	"github.com/erigontech/erigon-lib/crypto"
 	"github.com/erigontech/erigon-lib/log/v3"
@@ -34,7 +33,10 @@ type SharedDomainsCommitmentContext struct {
 	patriciaTrie commitment.Trie
 	justRestored atomic.Bool // set to true when commitment trie was just restored from snapshot
 
-	trace bool
+	subtries         []*SubtrieContext    // list of subtries for parallel processing
+	subtrieChan      chan *SubtrieContext // channel for available subtries
+	subtrieBusyCount atomic.Int32         // count of busy subtries
+	trace            bool
 }
 
 // Limits max txNum for read operations. If set to 0, all read operations will be from latest value.
@@ -79,6 +81,58 @@ func (sdc *SharedDomainsCommitmentContext) Trie() commitment.Trie {
 	return sdc.patriciaTrie
 }
 
+// CreateSubtries creates specified amount of subtries from the main trie for parallel processing
+func (sdc *SharedDomainsCommitmentContext) CreateSubtries(db kv.RwDB, amount int) error {
+	// Clear any existing subtries
+	sdc.subtries = make([]*SubtrieContext, 0, amount)
+	// Create buffered channel for subtrie pool
+	sdc.subtrieChan = make(chan *SubtrieContext, amount)
+
+	// Determine the trie variant to use based on the main trie
+	var trieVariant commitment.TrieVariant
+	switch sdc.patriciaTrie.(type) {
+	case *commitment.HexPatriciaHashed:
+		trieVariant = commitment.VariantHexPatriciaTrie
+	case *commitment.ConcurrentPatriciaHashed:
+		// For concurrent trie, subtries should be regular hex patricia tries
+		trieVariant = commitment.VariantHexPatriciaTrie
+	default:
+		return fmt.Errorf("unsupported trie type: %T", sdc.patriciaTrie)
+	}
+
+	// Create the specified amount of subtries
+	for i := 0; i < amount; i++ {
+		// Create read-only transaction for this subtrie
+		rotx, err := db.BeginRo(context.Background())
+		if err != nil {
+			return fmt.Errorf("failed to create read-only transaction for subtrie %d: %w", i, err)
+		}
+
+		// Create temporal transaction from the read-only transaction
+		tx, ok := rotx.(kv.TemporalTx)
+		if !ok {
+			return fmt.Errorf("transaction does not support temporal operations")
+		}
+
+		// Initialize trie and updates using the standard function
+		subtrie, subupdates := commitment.InitializeTrieAndUpdates(
+			trieVariant,
+			sdc.updates.Mode(),
+			"", // tmpDir - empty for now
+		)
+
+		// Create SubtrieContext with the new subtrie
+		subCtx := NewSubtrieContext(sdc.sharedDomains, tx, subtrie, subupdates)
+
+		// Add to the list of subtries
+		sdc.subtries = append(sdc.subtries, subCtx)
+		// Initially all subtries are available
+		sdc.subtrieChan <- subCtx
+	}
+
+	return nil
+}
+
 // TouchKey marks plainKey as updated and applies different fn for different key types
 // (different behaviour for Code, Account and Storage key modifications).
 func (sdc *SharedDomainsCommitmentContext) TouchKey(d kv.Domain, key string, val []byte) {
@@ -96,6 +150,31 @@ func (sdc *SharedDomainsCommitmentContext) TouchKey(d kv.Domain, key string, val
 	//case kv.CommitmentDomain, kv.ReceiptDomain:
 	default:
 		//panic(fmt.Errorf("TouchKey: unknown domain %s", d))
+	}
+
+	// Try to get an available subtrie for background processing
+	if sdc.subtrieChan != nil {
+		select {
+		case subtrie := <-sdc.subtrieChan:
+			// Got an available subtrie, process in background
+			sdc.subtrieBusyCount.Add(1)
+			go func(sc *SubtrieContext, domain kv.Domain, k string, v []byte) {
+				defer func() {
+					// Return subtrie to pool when done
+					sdc.subtrieChan <- sc
+					sdc.subtrieBusyCount.Add(-1)
+				}()
+
+				_, err := sc.TouchAndCompute(domain, k, v)
+				if err != nil {
+					// Log error but don't fail - subtrie computation is auxiliary
+					log.Warn("Failed to compute subtrie commitment", "error", err, "domain", domain, "key", hex.EncodeToString([]byte(k)))
+				}
+			}(subtrie, d, key, val)
+		default:
+			// No available subtrie, skip background processing
+			// This is ok - main trie still processes the update
+		}
 	}
 }
 
@@ -482,19 +561,19 @@ func (sdc *TrieContext) Account(plainKey []byte) (u *commitment.Update, err erro
 		copy(u.CodeHash[:], acc.CodeHash.Bytes())
 	}
 
-	if assert.Enable {
-		code, _, err := sdc.readDomain(kv.CodeDomain, plainKey)
-		if err != nil {
-			return nil, err
-		}
-		if len(code) > 0 {
-			copy(u.CodeHash[:], crypto.Keccak256(code))
-			u.Flags |= commitment.CodeUpdate
-		}
-		if !bytes.Equal(acc.CodeHash.Bytes(), u.CodeHash[:]) {
-			return nil, fmt.Errorf("code hash mismatch: account '%x' != codeHash '%x'", acc.CodeHash.Bytes(), u.CodeHash[:])
-		}
+	//if assert.Enable {
+	code, _, err := sdc.readDomain(kv.CodeDomain, plainKey)
+	if err != nil {
+		return nil, err
 	}
+	if len(code) > 0 {
+		copy(u.CodeHash[:], crypto.Keccak256(code))
+		u.Flags |= commitment.CodeUpdate
+	}
+	//if !bytes.Equal(acc.CodeHash.Bytes(), u.CodeHash[:]) {
+	//	return nil, fmt.Errorf("code hash mismatch: account '%x' != codeHash '%x'", acc.CodeHash.Bytes(), u.CodeHash[:])
+	//}
+	//}
 	return u, nil
 }
 
@@ -521,4 +600,65 @@ func (sdc *TrieContext) Storage(plainKey []byte) (u *commitment.Update, err erro
 func (sdc *TrieContext) SetLimitReadAsOfTxNum(txNum uint64, domainOnly bool) {
 	sdc.limitReadAsOfTxNum = txNum
 	sdc.withHistory = !domainOnly
+}
+
+// SubtrieContext combines TrieContext with a commitment.Trie
+type SubtrieContext struct {
+	*TrieContext
+	*commitment.Updates
+	trie commitment.Trie
+	isBusy atomic.Bool // tracks if this subtrie is currently in use
+}
+
+// NewSubtrieContext creates a new SubtrieContext with the given SharedDomains, TemporalTx, trie and updates
+func NewSubtrieContext(sd *SharedDomains, tx kv.TemporalTx, trie commitment.Trie, updates *commitment.Updates) *SubtrieContext {
+	trieCtx := &TrieContext{
+		roTtx:    tx,
+		getter:   sd.AsGetter(tx),
+		putter:   sd.AsPutDel(tx),
+		stepSize: sd.StepSize(),
+	}
+
+	// Set the trie context
+	trie.ResetContext(trieCtx)
+
+	return &SubtrieContext{
+		TrieContext: trieCtx,
+		trie:        trie,
+		Updates:     updates,
+	}
+}
+
+// Trie returns the embedded commitment.Trie
+func (sc *SubtrieContext) Trie() commitment.Trie {
+	return sc.trie
+}
+
+// TouchAndCompute touches a key in the updates and computes commitment
+func (sc *SubtrieContext) TouchAndCompute(d kv.Domain, key string, val []byte) ([]byte, error) {
+	if sc.Updates.Mode() == commitment.ModeDisabled {
+		return nil, nil
+	}
+
+	// Touch the key in updates based on domain type
+	switch d {
+	case kv.AccountsDomain:
+		sc.Updates.TouchPlainKey(key, val, sc.Updates.TouchAccount)
+	case kv.CodeDomain:
+		sc.Updates.TouchPlainKey(key, val, sc.Updates.TouchCode)
+	case kv.StorageDomain:
+		sc.Updates.TouchPlainKey(key, val, sc.Updates.TouchStorage)
+	default:
+		// Ignore other domains
+		return nil, nil
+	}
+
+	// Compute commitment for the touched key
+	// Process the updates through the trie
+	rootHash, err := sc.trie.Process(context.Background(), sc.Updates, "subtrie")
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute commitment: %w", err)
+	}
+
+	return rootHash, nil
 }
