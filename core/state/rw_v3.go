@@ -835,3 +835,34 @@ func returnReadList(v map[string]*dbstate.KvList) {
 	//}
 	readListPool.Put(v)
 }
+
+func WriteBalanceIncreaseSet(set map[common.Address]BalanceIncreaseEntry, domains *dbstate.SharedDomains, tx kv.Tx, withZombies bool) error {
+	var acc accounts.Account
+	emptyRemoval := withZombies // todo spurious dragon
+	for addr, increase := range set {
+		increase := increase
+		addrBytes := addr.Bytes()
+		enc0, step0, err := domains.GetLatest(kv.AccountsDomain, tx, addrBytes)
+		if err != nil {
+			return err
+		}
+		acc.Reset()
+		if len(enc0) > 0 {
+			if err := accounts.DeserialiseV3(&acc, enc0); err != nil {
+				return err
+			}
+		}
+		acc.Balance.Add(&acc.Balance, &increase.Amount)
+		if !increase.IsEscrow && emptyRemoval && acc.Nonce == 0 && acc.Balance.IsZero() && acc.IsEmptyCodeHash() {
+			if err := domains.DomainDel(kv.AccountsDomain, tx, addrBytes, domains.TxNum(), enc0, step0); err != nil {
+				return err
+			}
+		} else {
+			enc1 := accounts.SerialiseV3(&acc)
+			if err := domains.DomainPut(kv.AccountsDomain, tx, addrBytes, enc1, domains.TxNum(), enc0, step0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
