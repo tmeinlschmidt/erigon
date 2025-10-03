@@ -1858,6 +1858,7 @@ func (dt *DomainRoTx) prune(ctx context.Context, rwTx kv.RwTx, step kv.Step, txF
 	var valsCursor kv.RwCursor
 
 	ancientDomainValsCollector := etl.NewCollectorWithAllocator(dt.name.String()+".domain.collate", dt.d.dirs.Tmp, etl.SmallSortableBuffers, dt.d.logger).LogLvl(log.LvlTrace)
+	ancientDomainValsCollector.SortAndFlushInBackground(true)
 	defer ancientDomainValsCollector.Close()
 
 	if dt.d.LargeValues {
@@ -1886,7 +1887,8 @@ func (dt *DomainRoTx) prune(ctx context.Context, rwTx kv.RwTx, step kv.Step, txF
 	}
 
 	var k, v []byte
-	if prunedKey != nil && limit < 100_000 {
+	// Always resume from prune progress if available (optimization: no limit check)
+	if prunedKey != nil {
 		k, v, err = valsCursor.Seek(prunedKey)
 	} else {
 		k, v, err = valsCursor.First()
@@ -1895,6 +1897,7 @@ func (dt *DomainRoTx) prune(ctx context.Context, rwTx kv.RwTx, step kv.Step, txF
 		return nil, err
 	}
 	var stepBytes []byte
+	var batchCounter uint64 // Optimization: batch select checks every 1000 iterations
 	for ; k != nil; k, v, err = valsCursor.Next() {
 		if err != nil {
 			return stat, fmt.Errorf("iterate over %s domain keys: %w", dt.name.String(), err)
@@ -1926,15 +1929,21 @@ func (dt *DomainRoTx) prune(ctx context.Context, rwTx kv.RwTx, step kv.Step, txF
 		}
 		stat.MinStep = min(stat.MinStep, is)
 		stat.MaxStep = max(stat.MaxStep, is)
-		select {
-		case <-ctx.Done():
-			// consider ctx exiting as incorrect outcome, error is returned
-			return stat, ctx.Err()
-		case <-logEvery.C:
-			dt.d.logger.Info("[snapshots] prune domain", "name", dt.name.String(),
-				"pruned keys", stat.Values,
-				"steps", fmt.Sprintf("%.2f-%.2f", float64(txFrom)/float64(dt.stepSize), float64(txTo)/float64(dt.stepSize)))
-		default:
+
+		// Optimization: only check select every 1000 iterations to reduce overhead
+		batchCounter++
+		if batchCounter >= 1000 {
+			batchCounter = 0
+			select {
+			case <-ctx.Done():
+				// consider ctx exiting as incorrect outcome, error is returned
+				return stat, ctx.Err()
+			case <-logEvery.C:
+				dt.d.logger.Info("[snapshots] prune domain", "name", dt.name.String(),
+					"pruned keys", stat.Values,
+					"steps", fmt.Sprintf("%.2f-%.2f", float64(txFrom)/float64(dt.stepSize), float64(txTo)/float64(dt.stepSize)))
+			default:
+			}
 		}
 	}
 	mxPruneSizeDomain.AddUint64(stat.Values)
