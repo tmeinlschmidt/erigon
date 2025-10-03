@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 
 	"github.com/holiman/uint256"
@@ -394,6 +395,7 @@ func (ot *OeTracer) captureStartOrEnter(deep bool, typ vm.OpCode, from common.Ad
 		trace.Result = trResult
 	} else {
 		trace.Result = &TraceResult{}
+		trace.Result = &TraceResult{GasUsed: (*hexutil.Big)(big.NewInt(0)), Output: nil}
 		trace.Type = CALL
 	}
 	if deep {
