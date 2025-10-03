@@ -39,6 +39,7 @@ type hasher struct {
 	prefixBuf            [8]byte
 	bw                   *ByteArrayWriter
 	callback             func(common.Hash, Node)
+  accountRlpBuf        [128]byte // Optimization: reuse buffer for account RLP encoding
 }
 
 const rlpPrefixLength = 4
@@ -297,7 +298,14 @@ func (h *hasher) valueNodeToBuffer(vn ValueNode, buffer []byte, pos int) (int, e
 }
 
 func (h *hasher) accountNodeToBuffer(ac *AccountNode, buffer []byte, pos int) (int, error) {
-	acRlp := make([]byte, ac.EncodingLengthForHashing())
+  // Optimization: reuse accountRlpBuf to avoid allocation on every call
+  encLen := int(ac.EncodingLengthForHashing())
+  var acRlp []byte
+  if encLen <= len(h.accountRlpBuf) {
+  	acRlp = h.accountRlpBuf[:encLen]
+	} else {
+    acRlp = make([]byte, encLen)
+	}
 	ac.EncodeForHashing(acRlp)
 	enc := rlp.RlpEncodedBytes(acRlp)
 	h.bw.Setup(buffer, pos)
