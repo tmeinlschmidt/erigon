@@ -77,9 +77,11 @@ func NewReaderOnBytes(m []byte, fName string) (*Reader, int, error) {
 	v := header[0]
 
 	// 1 byte - version, 3 bytes - `Features`
-	featuresBytes := bytes.Clone(header[:4])
+	// Use stack allocation instead of bytes.Clone() to avoid memory leak
+	var featuresBytes [4]byte
+	copy(featuresBytes[:], header[:4])
 	featuresBytes[0] = 0 // mask version byte
-	features := Features(binary.BigEndian.Uint32(featuresBytes))
+	features := Features(binary.BigEndian.Uint32(featuresBytes[:]))
 	fileIsLittleEndian := features&IsLittleEndianFeature != 0
 	if fileIsLittleEndian != IsLittleEndian {
 		return nil, 0, fmt.Errorf("file %s is not compatible with your machine (different Endianness), but you can run `erigon snapshots index`", fName)

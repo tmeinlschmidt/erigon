@@ -18,7 +18,6 @@ package recsplit
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -182,9 +181,11 @@ func (idx *Index) init() (err error) {
 
 	// 1 byte: version, 7 bytes: app-specific minimal dataID (of current shard)
 	idx.version = idx.data[0]
-	baseDataBytes := bytes.Clone(idx.data[:8])
+	// Use stack allocation instead of bytes.Clone() to avoid memory leak
+	var baseDataBytes [8]byte
+	copy(baseDataBytes[:], idx.data[:8])
 	baseDataBytes[0] = 0
-	idx.baseDataID = binary.BigEndian.Uint64(baseDataBytes)
+	idx.baseDataID = binary.BigEndian.Uint64(baseDataBytes[:])
 
 	idx.keyCount = binary.BigEndian.Uint64(idx.data[8:])
 	idx.bytesPerRec = int(idx.data[16])

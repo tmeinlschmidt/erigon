@@ -215,5 +215,18 @@ func (b *Filter) Close() {
 	if b == nil {
 		return
 	}
-	b.fuseReader.Close()
+	// Release bloomfilter memory to prevent memory leak
+	if b.filter != nil {
+		b.filter = nil
+	}
+	// Close fuse reader if open
+	if b.fuseReader != nil {
+		b.fuseReader.Close()
+		b.fuseReader = nil
+	}
+	// Close fuse writer if still open
+	if b.fuseWriter != nil {
+		b.fuseWriter.Close()
+		b.fuseWriter = nil
+	}
 }

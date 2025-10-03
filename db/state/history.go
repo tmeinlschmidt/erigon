@@ -1031,7 +1031,9 @@ func (ht *HistoryRoTx) prune(ctx context.Context, rwTx kv.RwTx, txFrom, txTo, li
 		}
 
 		if ht.h.HistoryLargeValues {
-			seek = append(bytes.Clone(k), txnm...)
+			// Reuse pre-allocated seek buffer to avoid memory leak from bytes.Clone()
+			seek = append(seek[:0], k...)
+			seek = append(seek, txnm...)
 			if err := valsC.Delete(seek); err != nil {
 				return err
 			}

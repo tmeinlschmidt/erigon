@@ -215,7 +215,8 @@ func (n *Node) Decode(buf []byte) (uint64, error) {
 	if len(buf) < 10+l {
 		return 0, errors.New("short buffer")
 	}
-	n.key = buf[10 : 10+l]
+	// Clone the key to avoid holding reference to entire buf (memory leak fix)
+	n.key = bytes.Clone(buf[10 : 10+l])
 	//madvise(k, len(k), MADV_WILL_NEED)
 	return uint64(10 + l), nil
 }
